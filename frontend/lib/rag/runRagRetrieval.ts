@@ -4,14 +4,6 @@ import { vectorSearch } from "./vectorSearch";
 import { rerankResults } from "./rerankResults";
 import { buildContext } from "./buildContext";
 
-
-const transformedQuery = await transformQuery(query, chatModel);
-const embedding = await createEmbedding(transformedQuery);
-const searchResults = await vectorSearch(embedding);
-const rerankedResults = await rerankResults(transformedQuery, searchResults);
-const context = buildContext(rerankedResults);
-
-
 export async function runRagRetrieval({ message, chatModel }: any) {
   const query = message.parts
     .filter((part: any) => part.type === "text")
@@ -19,11 +11,19 @@ export async function runRagRetrieval({ message, chatModel }: any) {
     .join(" ");
 
   const transformedQuery = await transformQuery(query, chatModel);
+
+  const embedding = await createEmbedding(transformedQuery);
+
+  const searchResults = await vectorSearch(embedding);
+
+  const rerankedResults = await rerankResults(transformedQuery, searchResults);
+
+  const context = buildContext(rerankedResults);
+
   return {
     query,
     transformedQuery,
     rerankedResults,
     context,
   };
-
 }
