@@ -1,16 +1,18 @@
-import OpenAI from "openai";
-
-const qwenClient = new OpenAI({
-  apiKey: process.env.DASHSCOPE_API_KEY,
-  baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-});
+import { alibaba, type AlibabaEmbeddingModelOptions } from "@ai-sdk/alibaba";
+import { embed } from "ai";
 
 export async function createEmbedding(query: string) {
-  const response = await qwenClient.embeddings.create({
-    model: "text-embedding-v4",
-    input: query,
-    dimensions: 1024,
+  const { embedding } = await embed({
+    model: alibaba.embedding("text-embedding-v4"),
+    value: query,
+    providerOptions: {
+      alibaba: {
+        textType: "query",
+        dimension: 1024,
+        outputType: "dense",
+      } satisfies AlibabaEmbeddingModelOptions,
+    },
   });
 
-  return response.data[0].embedding;
+  return embedding;
 }
