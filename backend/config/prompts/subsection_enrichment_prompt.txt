@@ -1,0 +1,194 @@
+# Task
+
+You are enriching one already determined semantic chunk from an isolated subsection of a corporate annual report.
+The chunk boundary has already been determined and cannot be changed.
+Your goal is to generate retrieval focused metadata for the target chunk.
+The metadata will later be stored with the original chunk and used for retrieval.
+
+# Input Content
+
+You will receive:
+
+1. Metadata useful for understanding the subsection
+2. The full subsection as interpretation context
+3. One target chunk to enrich
+
+The full subsection is context only.
+Generate metadata only for information represented by the target chunk.
+Do not treat information from surrounding subsection blocks as though it were contained in the target chunk.
+Use surrounding context only to clarify headings, labels, abbreviations, references, tables, charts, or otherwise ambiguous target content.
+
+# Chunk Boundary Rules
+
+The target chunk is final.
+Do not split it.
+Do not combine it with surrounding content.
+Do not propose different block boundaries.
+Do not return block markers or source text.
+
+# Type
+
+Determine the content type of the complete target chunk.
+Allowed values:
+
+text
+table
+bar
+line
+area
+pie
+scatter
+donut
+multi-series
+mixed
+
+Use "text" when the chunk contains textual content and no table or chart that carries meaningful information.
+Use "table" when the chunk contains one or more tables and any surrounding text only serves as a heading, caption, label, note, explanation, or introduction to those tables.
+For a chart, use its chart type when the chunk contains one or more charts of that same type and any surrounding text only serves as a heading, caption, label, note, explanation, or introduction to those charts.
+Use "mixed" only when the chunk contains at least two different content types and each type contributes separate information that a user could reasonably retrieve.
+
+Examples:
+A heading followed by a table = table
+A short sentence introducing a table = table
+Two tables = table
+A caption followed by a bar chart = bar
+Two bar charts = bar
+
+A paragraph containing information not represented by the table, followed by a table = mixed
+A paragraph containing information not represented by the chart, followed by a bar chart = mixed
+A table and a bar chart that each provide separate information = mixed
+Multiple structures of the same type do not make the chunk mixed.
+
+# Category
+
+For tables and charts determine whether the structured content is primarily numerical or semantic.
+Allowed values:
+
+numerical
+semantic
+
+numerical means the structured content primarily represents quantitative values, measurements, financial figures, statistics, ratios, counts, percentages, or time series data.
+semantic means the structured content primarily organizes qualitative, descriptive, categorical, conceptual, or textual information.
+
+Category is required for tables and charts.
+Do not return category for text or mixed chunks.
+
+The target chunk may contain source extraction metadata with a field named "category", including values such as "financial".
+Ignore that source category value completely when producing the enrichment category.
+Reclassify the structured content using only these enrichment categories:
+numerical
+semantic
+"financial" is never a valid enrichment category.
+
+The example below shows the required field structure only.
+The example category value is not a default.
+Determine category independently for every target table using the Category rules above.
+
+# Description
+
+Generate a retrieval focused description of the target chunk.
+Use the target chunk together with the full subsection context to identify what information the target chunk represents.
+Describe what information a user could retrieve from the chunk rather than merely restating its formatting or structure.
+
+For tables and charts, describe what information the structured content represents.
+Use nearby subsection context only when it helps identify or clarify the meaning of the target content.
+Do not merely repeat table headers, chart axes, legend names, or categories.
+
+The description should contain enough semantic information to distinguish the target chunk from other information in the annual report.
+Do not include numerical data points merely because they appear in the source.
+A numerical value is worth keeping only when it acts as a defining label or likely retrieval identifier.
+
+Do not analyze or explain individual data points, trends, causes, or conclusions that are not explicitly expressed by the target chunk.
+
+# Keywords
+
+Generate concise lowercase keywords to improve retrieval.
+Use terms a user could reasonably search for based on the target chunk and relevant subsection context.
+Prefer specific concepts over generic words.
+Normalize equivalent terms when useful.
+Avoid duplicates, unsupported concepts, and numerical values unless the number itself is likely to be searched for.
+Only include keywords that materially improve retrieval.
+
+# Tables
+
+For a table return exactly these fields:
+
+{
+"type": "table",
+"category": "semantic",
+"description": "What information the table represents.",
+"rows": [],
+"columns": [],
+"units": [],
+"keywords": []
+}
+
+rows must contain meaningful row labels found in the table.
+columns must contain meaningful column labels found in the table.
+units must contain units explicitly represented by the table when available.
+Do not invent missing labels or units.
+Do not copy collections of numerical values.
+
+# Charts
+
+For a chart return exactly these fields:
+
+{
+"type": "bar",
+"category": "numerical",
+"description": "What information the chart represents.",
+"x_axis": "",
+"y_axis": "",
+"units": [],
+"series": [],
+"categories": [],
+"keywords": []
+}
+
+x_axis and y_axis should contain explicitly represented axis labels when available, otherwise return an empty string.
+units should contain explicitly represented units when available.
+series should contain meaningful series or legend labels.
+categories should contain meaningful categorical labels represented by the chart.
+Do not invent missing labels, axes, units, series, or categories.
+Do not copy collections of numerical values.
+
+# Text
+
+For text return exactly these fields:
+
+{
+"type": "text",
+"description": "What information can be retrieved from this chunk.",
+"keywords": []
+}
+
+# Mixed
+
+Mixed is currently used to identify and inspect genuinely mixed chunks rather than fully normalize every contained structure.
+For mixed content return exactly these fields:
+
+{
+"type": "mixed",
+"description": "What information can be retrieved from the complete mixed chunk.",
+"keywords": []
+}
+
+# Output Rules
+
+Return one valid JSON object only.
+Do not wrap the output in a chunks list.
+Do not include markdown.
+Do not explain your decisions.
+Do not return source blocks, block markers, source text, company, year, section, subsection, printed page, or physical page.
+Do not generate information unsupported by the target chunk and supplied subsection context.
+Return only the fields defined for the selected type.
+
+# Final Validation
+
+Before returning the JSON object, verify all of the following:
+
+1. The output contains every field required for the selected type. Never omit a required field. If an allowed list has no values, return []. If an axis label is unavailable, return "".
+2. If type is "table" or a chart type, category is exactly "numerical" or "semantic". Never return "financial" or any category copied from the source.
+3. If all meaningful structures have the same type, do not use "mixed".
+4. The output contains no fields that are not defined for the selected type.
+5. Return a complete JSON object even when some metadata fields are empty.

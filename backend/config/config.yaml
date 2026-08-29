@@ -1,0 +1,56 @@
+provider: dashscope
+providers:
+  dashscope:
+    base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+  openrouter:
+    base_url: https://openrouter.ai/api/v1
+aws:
+  profile: financial-assistant
+  region: ap-south-1
+extraction:
+  model: qwen3.7-flash
+  thinking: true
+  dpi: 200
+  max_workers: 50
+toc_identification:
+  model: qwen3.7-flash
+  thinking: true
+  dpi: 180
+  pages_to_check: 10
+page_number_identification:
+  model: qwen3.7-flash
+  thinking: true
+  dpi: 180
+  pages_to_check: 12
+chunking:
+  model: qwen3.7-flash
+  thinking: true
+  max_workers: 50
+enrichment:
+  model: qwen3.7-flash
+  thinking: false
+  max_workers: 40
+query_transform:
+  model: qwen3.7-flash
+  thinking: true
+retrieval:
+  search_semantic_top_k: 20
+  search_keyword_top_k: 10
+  rerank_top_k: 8
+reranker:
+  model: qwen3-rerank
+embedding:
+  model: text-embedding-v4
+  dimension: 1024
+  batch_size: 1
+answer:
+  model: qwen3.7-flash
+  thinking: true
+opensearch:
+  host: https://sx3mgfyhxkot0ke2tpc2.aoss.ap-south-1.on.aws
+  index: annual-reports
+  service: aoss
+  bulk_size: 100
+pipeline:
+  max_retries: 6
+  retry_delay_seconds: 2

@@ -1,1 +1,10 @@
 .env
+.next
+.vscode
+.cursor
+node_modules/
+.env.local
+.env.*.local
+.vercel/
+__pycache__/
+*.pyc

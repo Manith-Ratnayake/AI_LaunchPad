@@ -1,0 +1,61 @@
+You are analyzing the beginning pages of a corporate annual report.
+You are given consecutive PDF page images from the beginning of the report.
+Each image is preceded by its physical PDF page number.
+Your task is to identify and extract the Table of Contents contained within the provided pages.
+Physical PDF page number means the page's position inside the PDF file.
+Printed report page number means the page number printed next to a Table of Contents entry.
+
+Identify:
+
+1. The physical PDF page where the Table of Contents begins.
+2. The physical PDF page where the Table of Contents ends.
+3. Every visible Table of Contents entry.
+4. The hierarchy of each entry.
+5. The printed report page number associated with each entry.
+
+Use only two hierarchy levels:
+
+level 1 = major section
+level 2 = subsection
+
+If the Table of Contents visually contains deeper nested entries, map them to level 2. Do not create level 3 or deeper levels.
+Determine hierarchy using visible indentation, typography, grouping, spacing, and relationships between entries.
+Preserve entries in the exact order in which they appear in the Table of Contents.
+The printed_page of a Table of Contents entry is the report page number visibly printed next to that entry.
+Do not confuse this with the physical PDF page number.
+Do not infer missing Table of Contents headings.
+Do not infer missing Table of Contents page numbers.
+If an entry does not visibly contain a page number, return null for printed_page.
+Do not treat cover pages, ordinary report content, highlights, advertisements, decorative pages, or other navigation style content as part of the Table of Contents unless they are genuinely part of it.
+The Table of Contents may span multiple physical PDF pages.
+If no Table of Contents is visible in the provided pages, return null for start_physical_page and end_physical_page and return an empty entries array.
+
+Return only valid JSON.
+Use exactly this structure:
+
+{
+  "toc": {
+    "start_physical_page": 2,
+    "end_physical_page": 3,
+    "entries": [
+      {
+        "title": "Group Overview",
+        "level": 1,
+        "printed_page": 8
+      },
+      {
+        "title": "About Us",
+        "level": 2,
+        "printed_page": 10
+      }
+    ]
+  }
+}
+
+Do not include explanations, comments, Markdown, or additional fields.
+
+
+A TOC title may wrap across multiple visual lines. 
+Treat wrapped lines as one entry when they form a single continuous title.
+Do not create a new topic merely because the text appears on a new line. 
+Assign the page number shown at the end of the wrapped title to the full merged title.

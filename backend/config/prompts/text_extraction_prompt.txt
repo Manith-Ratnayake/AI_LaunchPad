@@ -1,0 +1,266 @@
+# Task
+
+Extract meaningful information from a corporate annual report for use by a financial assistant.
+Preserve enough information so that the extracted output can be understood without seeing the original page image.
+Preserve source wording exactly. Do not correct spelling, grammar, terminology, apparent typos, or factual inconsistencies.
+
+
+# Content to Keep
+
+Keep all meaningful report content, including headings, subheadings, paragraphs, lists, labels, values, KPI and information blocks, footnotes, captions, tables, charts, infographics, diagrams, awards, certifications, accreditations, ratings, recognitions, and their associated labels and values.
+Preserve visible section and subsection structure using plain text headings only. Do not add Markdown or HTML formatting for headings
+
+
+# Content to Ignore
+
+Ignore company logos used only for branding.
+Ignore decorative or non informational visual elements such as photographs, backgrounds, watermarks, and decorative icons.
+Ignore page level headers and footers that are publication metadata rather than report content, such as company name, report title, or page numbers.
+Do not ignore genuine section or subsection headings merely because they appear at the top or bottom of a page.
+Do not add signatures
+
+# Extraction Order
+
+Preserve semantic reading order rather than visual layout.
+For multi column pages, complete one logical column or semantic section before moving to the next.
+Do not mix text from unrelated columns, sections, or visual regions.
+
+
+# Content Type Classification
+
+Before extracting each meaningful visual region, determine what type of content it actually is.
+Possible content types include: Heading, Paragraph, List, KPI or information block, Actual table, Actual chart, Infographic or diagram, Other meaningful report content.
+Choose the content type based on how the information is actually presented in the source.
+Do not classify paragraphs, lists, KPI blocks, text boxes, diagrams, infographics, grouped labels, or visually aligned text as tables merely because they contain multiple values or could conveniently be arranged into rows and columns.
+If content is not an actual table or chart and can be represented naturally as ordinary text without losing meaning, output it as ordinary text.
+Content type classification is an internal decision only. Do not output the classification.
+
+
+# Semantic Blocks
+
+A semantic block is a group of content that belongs together.
+Example:
+A heading should be its own block.
+A paragraph should be its own block.
+A list belonging to one concept should remain together as one block.
+A KPI or information block should remain together when its labels and values belong together.
+A table should remain one block.
+A chart should remain one block.
+An infographic or diagram should remain one block.
+
+Do not combine unrelated headings, paragraphs, lists, tables, charts, columns, or sections into one block.
+Join wrapped visual lines that belong to the same paragraph.
+Within one infographic or diagram, keep all visually connected elements together when their relationship is important.
+Do not preserve spacing used only for visual alignment, indentation, centering, or decoration.
+Use a single blank line between semantic blocks.
+
+
+# Ordinary Text
+
+Headings, paragraphs, lists, KPI blocks, infographics, diagrams, and other ordinary report content must be output directly as readable text.
+Do not represent ordinary text as JSON.
+For KPI and information blocks, preserve the information as readable label value pairs.
+
+Example:
+Customer Confidence
+Total Surgeries: 150,000+
+Cardiac Surgeries: 11,000+
+IVF Babies: 1,500+
+
+# Infographics and Diagrams
+
+Do not convert an infographic, diagram, process flow, framework, relationship diagram, or group of information boxes into table or chart JSON unless the source itself is actually presented as a table or chart.
+Preserve meaningful text, labels, values, categories, and relationships in readable text form.
+When relationships between elements are important for understanding the visual, express those relationships clearly in text.
+Do not invent relationships that are not visible in the source.
+
+# Tables
+
+Only actual tables may use table JSON.
+A table is determined by the structure shown in the source, not by whether the information could conveniently be arranged into rows and columns.
+Every table must contain a `"category"` attribute.
+The only allowed table categories are `"numerical"` and `"semantic"`.
+Use `"numerical"` when the table primarily contains numerical or quantitative information, including monetary values, accounting information, financial performance, financial position, financial ratios, earnings, dividends, share information, operational metrics, counts, percentages, ratios, statistics, KPIs, or other measured values.
+Use `"semantic"` when the table primarily contains descriptive, categorical, organizational, governance, risk, sustainability, strategic, or other non numerical information.
+
+Use this structure:
+
+```json
+{
+  "type": "table",
+  "category": "numerical",
+  "title": "",
+  "headers": ["Item", "2025", "2024"],
+  "rows": [
+    ["Revenue (Rs. million)", "14,474", "-"],
+    ["Profit after tax (Rs. million)", "1,944", "1,339"]
+  ]
+}
+```
+
+Extract only values explicitly shown in the table.
+Do not infer, estimate, calculate, correct, or create table values.
+For an actual table data cell with no displayed value, use `"-"`.
+Never replace a missing value with `"0"`.
+Use `"0"` only when the source explicitly displays zero.
+Empty cells used only for structural purposes, such as section headers or group header rows, may remain `""`.
+If the table contains actual footnotes, explanatory notes, symbols, units, or qualifications, include:
+
+```json
+"notes": ["* Restated", "Figures in LKR million"]
+```
+
+If there are no table notes, omit the `"notes"` field entirely.
+
+# Charts
+
+Only actual charts may use chart JSON.
+Preserve visible chart titles, axis labels, legends, series names, categories, currencies, percentages, and units.
+When a chart explicitly displays a numerical value, extract that value exactly.
+Do not add `[ESTIMATED]` to values explicitly written in the chart.
+When a numerical value is represented visually but is not explicitly written, such as through bar height, point position, line position, or area height, estimate the value from the chart and append exactly `" [ESTIMATED]"`.
+Estimate chart values only from the chart itself.
+Do not use nearby tables, paragraphs, KPI blocks, captions, or other page content to fill missing chart values.
+
+Bar Chart:
+
+```json
+{
+  "type": "bar",
+  "title": "",
+  "x_axis": "",
+  "y_axis": "",
+  "unit": "",
+  "data": [{"category": "2025", "value": "23"}]
+}
+```
+
+Multi Series Bar Chart:
+
+```json
+{
+  "type": "bar",
+  "title": "",
+  "x_axis": "",
+  "y_axis": "",
+  "unit": "",
+  "series": [{"name": "", "data": [{"category": "2025", "value": "24"}]}]
+}
+```
+
+Line Chart:
+
+```json
+{
+  "type": "line",
+  "title": "",
+  "x_axis": "",
+  "y_axis": "",
+  "unit": "",
+  "data": [{"x": "2025", "value": "23 [ESTIMATED]"}]
+}
+```
+
+Multi Series Line Chart:
+
+```json
+{
+  "type": "line",
+  "title": "",
+  "x_axis": "",
+  "y_axis": "",
+  "unit": "",
+  "series": [{"name": "", "data": [{"x": "2025", "value": "18"}]}]
+}
+```
+
+Pie Chart:
+
+```json
+{
+  "type": "pie",
+  "title": "",
+  "unit": "",
+  "data": [{"category": "Category A", "value": "35"}]
+}
+```
+
+Donut Chart:
+
+```json
+{
+  "type": "donut",
+  "title": "",
+  "unit": "",
+  "data": [{"category": "Category A", "value": "30"}]
+}
+```
+
+Area Chart:
+
+```json
+{
+  "type": "area",
+  "title": "",
+  "x_axis": "",
+  "y_axis": "",
+  "unit": "",
+  "data": [{"x": "2025", "value": "28"}]
+}
+```
+
+Scatter Chart:
+
+```json
+{
+  "type": "scatter",
+  "title": "",
+  "x_axis": "",
+  "y_axis": "",
+  "unit": "",
+  "data": [{"label": "Item A", "x": "12", "y": "27"}]
+}
+```
+
+The values in these examples are placeholders only.
+Use only information obtained from the source page.
+If the chart type is not listed above, create an appropriate JSON structure that preserves the chart's information.
+Do not force a chart into an unsuitable structure that would lose or misrepresent information.
+
+# JSON Requirements
+
+Only actual tables and actual charts may be represented as JSON.
+Every table and chart must contain valid, parseable JSON.
+Wrap every table or chart JSON object in a fenced JSON code block beginning with `json and ending with `.
+Use JSON strings for every extracted data value, including integers, decimals, percentages, dates, labels, and text.
+Do not convert extracted values to numeric, boolean, null, or other JSON data types during extraction.
+A downstream program will perform type conversion later.
+Any value containing `[ESTIMATED]` must remain a single JSON string.
+Use exactly:
+
+```json
+"value": "789 [ESTIMATED]"
+```
+
+# Empty Pages
+
+If the source page contains no meaningful report content, output exactly: <EMPTY>
+If `<EMPTY>` is used, it must be the entire output for that page.
+
+
+# Final Verification
+
+On the cover page, keep the company name, report title, reporting period, and meaningful tagline. Ignore logos and decorative images.
+Only charts and tables should be only in json format
+Ordinary report text must remain ordinary readable text.
+Infographics and diagrams must remain readable text unless they are genuinely tables or charts.
+Source wording and explicitly displayed values must not be corrected, calculated, inferred, or altered.
+Estimated values may only be used for visually encoded chart values that are not explicitly written.
+Every table must contain either `"category": "numerical"` or `"category": "semantic"`.
+Every table and chart must contain valid parseable JSON.
+Never output JSON with `"type": "heading"`, `"type": "paragraph"`, `"type": "text"`, `"type": "list"`, `"type": "infographic"`, or `"type": "semantic"`.
+Do not output classification labels such as heading, paragraph, list, text, infographic, or semantic.
+Do not wrap the entire page in JSON.
+Only tables and charts may use fenced JSON code blocks.
+Do not use Markdown or HTML for ordinary report text. 
+Do not add any reasoning output

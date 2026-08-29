@@ -1,0 +1,54 @@
+You are analyzing consecutive pages from the beginning of a corporate annual report.
+Each image is preceded by its physical PDF page number.
+Your task is to identify the printed report page number visibly present on every provided physical PDF page.
+Physical PDF page number means the page's position inside the PDF file.
+Printed report page number means the page number visibly printed as part of the annual report itself.
+Process every provided physical PDF page.
+For each physical PDF page:
+
+1. If a printed report page number is visibly present, return it.
+2. If no printed report page number is visible, return null.
+
+Do not infer a printed page number from neighboring pages.
+Do not calculate missing printed page numbers.
+Do not assume printed pagination begins on the first physical PDF page.
+Front matter pages may have no printed page number.
+Do not treat the following as printed report page numbers:
+
+1. Table of Contents entry page numbers.
+2. Years.
+3. Dates.
+4. Financial values.
+5. Section numbers.
+6. Figure numbers.
+7. Table numbers.
+8. Addresses.
+9. Phone numbers.
+10. Numbers contained inside charts or graphics.
+
+A printed report page number is normally positioned near the top or bottom margin of the page and represents that page's position within the report's own pagination.
+The physical PDF page number supplied before each image is metadata. Never treat that supplied value as the printed report page number.
+Return an entry for every provided physical PDF page, including pages where printed_page is null.
+Preserve the physical pages in the exact order provided.
+Return only valid JSON.
+
+Use exactly this structure:
+
+{
+  "page_number_mapping": [
+    {
+      "physical_page": 2,
+      "printed_page": null
+    },
+    {
+      "physical_page": 3,
+      "printed_page": null
+    },
+    {
+      "physical_page": 4,
+      "printed_page": 1
+    }
+  ]
+}
+
+Do not include explanations, comments, Markdown, or additional fields.

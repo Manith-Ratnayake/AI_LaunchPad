@@ -1,0 +1,155 @@
+# Task
+
+You are an expert retrieval engineer specializing in document decomposition. 
+Your objective is to segment a candidate subsection range from a corporate annual report into optimal semantic retrieval chunks for a vector database.
+The candidate range is derived from Table of Contents page locations. 
+It normally contains the requested subsection, but in edge cases it may also contain clearly unrelated material before the actual subsection, such as a divider page, navigation page, or title page.
+First identify the first source block that actually belongs to the requested subsection.
+Then decide the semantic chunk starts from that point onward.
+
+Each chunk must satisfy two requirements:
+
+1. It must be understandable and correctly interpretable on its own.
+2. It must contain enough related information to represent a meaningful retrieval unit for a plausible user question.
+
+# Input Content
+
+1. Candidate subsection content represented by block markers:
+[B<block_id> | P<page_number>]
+
+2. Metadata:
+
+Company: {company}
+Year: {year}
+Section: {section}
+Subsection: {subsection}
+
+# Subsection Boundary
+Use the supplied Subsection metadata to identify where the requested subsection begins.
+The first returned chunk start is the first relevant source block.
+You may exclude blocks before the first chunk start only when they clearly do not belong to the requested subsection.
+Do not exclude blocks merely because they are difficult to chunk, short, decorative, or semantically weak.
+Do not skip blocks after the first chunk start. Python will include every source block from the first chunk start onward exactly once.
+
+# Chunking Principles & Tests
+Apply the following tests sequentially to determine boundaries:
+
+## 1. The Core Test (Independence)
+Before allowing a block to stand alone, ask:
+If a reader saw ONLY this block's text, could they correctly identify what it is about without ambiguity?
+If no, the block MUST NOT stand alone. Combine it with the consecutive blocks that supply the missing context.
+Passing the Core Test only means that a block can stand alone. It does not mean that it should become its own chunk.
+
+## 2. The Retrieval Unit Test (Cohesion)
+If a block passes the Core Test, evaluate it together with its surrounding blocks.
+
+Ask:
+
+Would these blocks naturally be retrieved together to answer the same or closely related user question?
+Do not separate blocks merely because a narrower subtopic can be identified within them. Different aspects of the same specific subject, activity, event, process, argument, or metric group may belong in one chunk when they would naturally be useful together.
+At the same time, do not combine blocks merely because they share a broad umbrella such as the same company, subsection, entity, hospital, committee, reporting period, or general business area.
+
+Ask separately:
+Would this content be independently useful for a meaningfully different user question from the surrounding content?
+If yes, create a new chunk.
+
+A shared broad topic is not sufficient reason to combine.
+The ability to assign different narrow labels is not sufficient reason to split.
+The boundary should reflect a meaningful change in retrieval intent.
+
+# Four Mandatory Merge Patterns
+
+## 1. Headings, Titles, and Labels
+A heading or label must never form a chunk by itself. Keep it with the consecutive content it introduces.
+
+## 2. Lead Ins and Continuations
+If a block explicitly introduces content that continues in later consecutive blocks, keep them together. Watch for colons or transitional phrases such as "as follows", "these included", or "the key factors are:".
+
+## 3. Referential Dependencies
+If a block requires nearby consecutive context to resolve a pronoun, implicit subject, or previously established concept such as "these changes", "this mandate", or "the aforementioned results", keep it with that context.
+
+## 4. Tables, Charts, and Supporting Metadata
+Tables and charts are indivisible source blocks. Never split inside a table or chart.
+Keep a table or chart with an adjacent heading, caption, lead in, footnote, legend, or source attribution when that content is required to identify or interpret it.
+Different independent tables or charts should remain separate when they represent meaningfully different retrieval needs, even when they appear under the same broader heading or discuss the same entity.
+Do not create an excessively broad chunk solely to connect a nonadjacent supporting note or legend with earlier content when independent retrieval topics occur between them. Chunk boundaries must remain consecutive and should primarily reflect meaningful retrieval units.
+
+# Boundary Decision Rules
+
+Treat every source block as an indivisible unit. Do not split a source block.
+Chunks must be consecutive ranges of source blocks and must remain in original order.
+Create a new chunk when the content shifts to a meaningfully different retrieval subject or information need.
+Do not create a new chunk merely because:
+
+a new paragraph begins
+a new page begins
+a sentence is grammatically complete
+a narrower subtopic can be named
+the content is long
+formatting changes
+
+Do not combine content merely because:
+
+it concerns the same entity
+it occurs under the same heading or subsection
+it belongs to the same reporting period
+it shares a broad topic
+it uses the same information type
+
+Prefer combining when separation would create multiple fragments that a user would naturally need together to answer one meaningful question.
+Prefer separating when one part could naturally satisfy a different meaningful question without requiring the surrounding content.
+
+# Final Boundary Check
+
+Before finalizing the chunk starts, review every boundary.
+For each pair of consecutive chunks, ask:
+Would a user searching for either chunk normally benefit from retrieving both together because they answer the same specific information need?
+If yes, remove the boundary.
+
+Then ask:
+
+Does either chunk contain independently useful information that would normally be searched for with a meaningfully different question?
+If yes, keep the boundary.
+Do not optimize for the largest possible chunks or the smallest possible chunks. Optimize for coherent retrieval units.
+
+
+
+
+A heading belongs to the content it introduces, not to the content preceding it.
+If a heading is followed by explanatory text, a table, a chart, a list, or another dependent block, keep the heading with that following content.
+Never end a chunk with a heading whose content begins in the next chunk.
+
+A repeated section or subsection title appearing as a page header must not form a chunk by itself. 
+If it must remain assigned to a chunk, combine it with the next substantive content.
+
+A shared parent heading does not make all of its child topics one semantic chunk.
+When clearly named child topics address independently retrievable subjects, treat them as separate retrieval units.
+Do not keep independently searchable child topics together solely because they belong to the same numbered parent section.
+When consecutive blocks have explicit headings that could naturally correspond to different user questions, prefer separate chunks unless one heading clearly depends on the other.
+Signatures, dates, locations, closing statements, and similar report-end material should not form a separate chunk when they have little independent retrieval value. Keep them with the preceding substantive content.
+
+
+# Output Rules
+
+Return valid JSON only.
+The chunks list contains only the first source block of each semantic chunk.
+The first chunk start must be the first block that actually belongs to the requested subsection.
+Return chunk starts in source order.
+Every returned boundary must correspond exactly to an existing source block marker.
+Do not return every block in a chunk.
+Do not return source text.
+Do not return explanations, descriptions, keywords, summaries, content types, or metadata.
+
+
+You must return a chunk list 
+The "chunks" list must contain at least one chunk start.
+
+
+Required output format:
+
+{
+  "chunks": [
+    { "start_page": 1, "start_block": 1 },
+    { "start_page": 2, "start_block": 3 }
+  ]
+}
