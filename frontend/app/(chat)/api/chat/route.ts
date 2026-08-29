@@ -49,14 +49,23 @@ import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
 import { runRagRetrieval } from "@/lib/rag/runRagRetrieval";
 import { buildAnswerPrompt } from "@/lib/rag/answerPrompt";
+
 export const maxDuration = 60;
 
 const HEALTH_CHECK_DELAY_MS = 9000;
 
+function describeError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const cause = error.cause instanceof Error ? ` | Cause: ${error.cause.message}` : "";
+
+  return `${error.name}: ${error.message}${cause}`;
+}
+
 function isModelStreamActivity(chunk: { type: string }) {
-  return !["start", "start-step", "finish-step", "finish", "raw"].includes(
-    chunk.type
-  );
+  return !["start", "start-step", "finish-step", "finish", "raw"].includes(chunk.type);
 }
 
 function getStreamContext() {
@@ -75,13 +84,13 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     requestBody = postRequestBodySchema.parse(json);
-  } catch {
+  } catch (error) {
+    console.error("REQUEST PARSING ERROR:", error);
     return new ChatbotError("bad_request:api").toResponse();
   }
 
   try {
-    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
-      requestBody;
+    const { id, message, messages, selectedChatModel, selectedVisibilityType } = requestBody;
 
     const [botIdResult, session] = await Promise.all([
       checkBotId().catch(() => null),
@@ -153,13 +162,11 @@ export async function POST(request: Request) {
               ]) ?? []
         )
       );
+
       uiMessages = dbMessages.map((msg) => ({
         ...msg,
         parts: msg.parts.map((part) => {
-          if (
-            "toolCallId" in part &&
-            approvalStates.has(String(part.toolCallId))
-          ) {
+          if ("toolCallId" in part && approvalStates.has(String(part.toolCallId))) {
             return { ...part, ...approvalStates.get(String(part.toolCallId)) };
           }
           return part;
@@ -223,6 +230,7 @@ export async function POST(request: Request) {
           if (hasModelActivity && phase !== "thinking") {
             return;
           }
+
           dataStream.write({
             data: {
               message: messageText,
@@ -258,6 +266,7 @@ export async function POST(request: Request) {
           if (hasModelActivity) {
             return;
           }
+
           hasModelActivity = true;
           clearHealthCheckTimer();
           writeWaitingStatus("thinking", "Thinking...");
@@ -268,10 +277,23 @@ export async function POST(request: Request) {
           clearHealthCheckTimer();
         };
 
-        const ragResult = await runRagRetrieval({
-          message,
-          chatModel,
-        });
+        let ragResult;
+
+        try {
+          console.log("RAG START", { chatModel });
+          ragResult = await runRagRetrieval({
+            message,
+            chatModel,
+          });
+          console.log("RAG COMPLETE", {
+            chatModel,
+            retrievedResults: ragResult.rerankedResults?.length ?? 0,
+          });
+        } catch (error) {
+          stopWaitingStatus();
+          console.error("RAG PIPELINE ERROR:", error);
+          throw error;
+        }
 
         const result = streamText({
           activeTools:
@@ -284,9 +306,6 @@ export async function POST(request: Request) {
                   "updateDocument",
                   "requestSuggestions",
                 ],
-
-
-
           instructions: buildAnswerPrompt(ragResult.context),
           messages: modelMessages,
           model: getLanguageModel(chatModel),
@@ -301,8 +320,9 @@ export async function POST(request: Request) {
           onEnd() {
             stopWaitingStatus();
           },
-          onError() {
+          onError({ error }) {
             stopWaitingStatus();
+            console.error("FINAL MODEL STREAM ERROR:", error);
           },
           providerOptions: {
             ...(modelConfig?.gatewayOrder && {
@@ -350,8 +370,8 @@ export async function POST(request: Request) {
             const title = await titlePromise;
             dataStream.write({ data: title, type: "data-chat-title" });
             updateChatTitleById({ chatId: id, title });
-          } catch {
-            /* non-fatal */
+          } catch (error) {
+            console.error("CHAT TITLE ERROR:", error);
           }
         }
       },
@@ -360,9 +380,8 @@ export async function POST(request: Request) {
         if (isToolApprovalFlow) {
           await Promise.all(
             finishedMessages.map(async (finishedMsg) => {
-              const existingMsg = uiMessages.find(
-                (m) => m.id === finishedMsg.id
-              );
+              const existingMsg = uiMessages.find((m) => m.id === finishedMsg.id);
+
               if (existingMsg) {
                 await updateMessage({
                   id: finishedMsg.id,
@@ -399,15 +418,12 @@ export async function POST(request: Request) {
         }
       },
       onError: (error) => {
-        if (
-          error instanceof Error &&
-          error.message?.includes(
-            "AI Gateway requires a valid credit card on file to service requests"
-          )
-        ) {
-          return "AI Gateway requires a valid credit card on file to service requests. Please visit https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dadd-credit-card to add a card and unlock your free credits.";
-        }
-        return "Oops, an error occurred!";
+        const message = describeError(error);
+
+        console.error("CHAT STREAM ERROR:", error);
+        console.error("CHAT STREAM ERROR DESCRIPTION:", message);
+
+        return message;
       },
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
     });
@@ -417,24 +433,33 @@ export async function POST(request: Request) {
         if (!process.env.REDIS_URL) {
           return;
         }
+
         try {
           const streamContext = getStreamContext();
+
           if (streamContext) {
             const streamId = generateId();
             await createStreamId({ chatId: id, streamId });
+
             await streamContext.createNewResumableStream(
               streamId,
               () => sseStream
             );
           }
-        } catch {
-          /* non-critical */
+        } catch (error) {
+          console.error("RESUMABLE STREAM ERROR:", error);
         }
       },
       stream,
     });
   } catch (error) {
     const vercelId = request.headers.get("x-vercel-id");
+    const message = describeError(error);
+
+    console.error("UNHANDLED CHAT API ERROR:", error, {
+      description: message,
+      vercelId,
+    });
 
     if (error instanceof ChatbotError) {
       return error.toResponse();
@@ -449,7 +474,6 @@ export async function POST(request: Request) {
       return new ChatbotError("bad_request:activate_gateway").toResponse();
     }
 
-    console.error("Unhandled error in chat API:", error, { vercelId });
     return new ChatbotError("offline:chat").toResponse();
   }
 }
